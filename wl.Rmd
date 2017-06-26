@@ -1,0 +1,129 @@
+---
+title: "Human activity analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Overview
+
+This report uses the Weightlifting exercise dataset to build a model that predicts the manner in which 6 participants do a particular dumbell exercise. The data was obtained from http://groupware.les.inf.puc-rio.br/har. 
+
+### Summary of findings
+
+A random forest approach gives a model that has a low rate of error (OOB error rate: 0.65%). A decision tree approach was also attemtped with poor results. A validation set was also used to verify the accuracy of both models. The random forest algorith yielded good results on the validation set.
+
+### Description of the approach
+
+**Cleaning Data: **  An exploration of the training data shows that there are many columns that have a large number of NA values. These columns were removed from the training set. Additionally, fields like the index field (X), time stamp fields were also removed as they have no relevance to the analysis. The user_name field was also removed as it reflected the structure we were trying to predict. The cleaned dataset had 53 columns. 
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE, cache=TRUE}
+# Load libraries
+library(caret)
+library(ggplot2)
+library(rattle)
+library(randomForest)
+
+# Read the data
+wttrain <- read.csv("pml-training.csv", sep=",", header=TRUE, na.strings = c("", "#DIV/0!"))
+
+ 
+#remove columns with NA values
+NAlist <- names(wttrain)[sapply(wttrain, function(x) sum(is.na(x))>1000)]
+subwttrain <- wttrain[, !(names(wttrain) %in% NAlist)]
+subwttrain[,grep("^avg_", names(subwttrain))] <- NULL
+subwttrain[,grep("^stddev_", names(subwttrain))] <- NULL
+subwttrain[,grep("^var_", names(subwttrain))] <- NULL
+subwttrain[,grep("^min_", names(subwttrain))] <- NULL
+subwttrain[,grep("^max_", names(subwttrain))] <- NULL
+subwttrain[,grep("^amplitude_", names(subwttrain))] <- NULL
+
+# Remove columns that have no relevance to model
+subwttrain$cvtd_timestamp <- NULL
+subwttrain$raw_timestamp_part_1 <- NULL
+subwttrain$raw_timestamp_part_2 <- NULL
+subwttrain$num_window <- NULL
+subwttrain$X <- NULL
+# Remove user_name as it is the same as the outcome we are trying to predict
+subwttrain$user_name <- NULL
+subwttrain$new_window <- NULL
+
+```
+
+
+**Creating a validation set:** 25% of the training set was set aside as a validation set. 
+
+```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
+# Divide training set into validation and training sets
+set.seed(111)
+wttrain_i <- createDataPartition(subwttrain$classe, p=.75, list=FALSE)
+wttrain_final <- subwttrain[wttrain_i, ]
+wtvalid_final <- subwttrain[-wttrain_i, ]
+
+```
+
+**Model fitting - Decision Tree:** Since the response variable has five possible categorical outcomes, a decision tree model was attempted. The model did not yeild good results. The decision tree is shown below. The predicted values on the validation set are compared to the actual values below, showing quite a bit of divergence between the predictions and actual values.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
+
+wtmoddt <- train(classe~., data=wttrain_final, method='rpart')
+fancyRpartPlot(wtmoddt$finalModel)
+wtdtpred <- predict(wtmoddt, newdata = wtvalid_final)
+table(wtdtpred, wtvalid_final$classe)
+
+```
+
+
+**Model fitting - Random Forest:** A random forest algorithm with 50 trees gave good results when tested on the validation set. The model is described below:
+
+```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
+
+wtmodrf <- randomForest(classe~., data=wttrain_final, ntree=50)
+print(wtmodrf)
+
+```
+
+The variables that have the highest priority in the model are seen in the plot below. 
+
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+library(randomForest)
+varImpPlot(wtmodrf)
+```
+
+The model is used to predict against the validation set, and the results are tabulated below, showing a high degree of agreement between the forecast and results. 
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+library(randomForest)
+wtrfpred <- predict(wtmodrf, newdata = wtvalid_final)
+table(wtrfpred, wtvalid_final$classe)
+
+```
+
+
+
+```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
+
+# Read the data
+wttest <- read.csv("pml-testing.csv", sep=",", header=TRUE, na.strings =c("", "#DIV/0!") )
+
+#Remove NA values
+subwttest <- wttest[, !(names(wttest) %in% NAlist)]
+subwttest[,grep("^avg_", names(subwttest))] <- NULL
+subwttest[,grep("^stddev_", names(subwttest))] <- NULL
+subwttest[,grep("^var_", names(subwttest))] <- NULL
+subwttest[,grep("^min_", names(subwttest))] <- NULL
+subwttest[,grep("^max_", names(subwttest))] <- NULL
+subwttest[,grep("^amplitude_", names(subwttest))] <- NULL
+subwttest$cvtd_timestamp <- NULL
+subwttest$num_window <- NULL
+subwttest$raw_timestamp_part_1 <- NULL
+subwttest$raw_timestamp_part_2 <- NULL
+subwttest$X <- NULL
+subwttest$user_name <- NULL
+subwttest$new_window <- NULL
+
+library(randomForest)
+#predict(wtmodrf, newdata = subwttest)
+```
