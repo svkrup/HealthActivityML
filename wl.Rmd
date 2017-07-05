@@ -73,6 +73,19 @@ wtdtpred <- predict(wtmoddt, newdata = wtvalid_final)
 table(wtdtpred, wtvalid_final$classe)
 
 ```
+**Model fitting - Boosting model:** A gradient boosting model was applied with cross validation of the training data, yielding  high accuracy.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
+wtmodgbm <- train(classe~., data=wttrain_final, method="gbm", trControl=trainControl(method="cv"), verbose=FALSE)
+
+print(wtmodgbm)
+
+wtgbmpred <- predict(wtmodgbm, newdata=wtvalid_final, n.trees = wtmodgbm$bestTune$n.trees)
+
+confusionMatrix(wtgbmpred, wtvalid_final$classe)
+
+
+```
 
 
 **Model fitting - Random Forest:** A random forest algorithm with 50 trees gave good results when tested on the validation set. The model is described below:
@@ -101,6 +114,7 @@ table(wtrfpred, wtvalid_final$classe)
 
 ```
 
+**Conclusion**: The gbm model gives good accuracy but the random forest model is the winner with higher accuracy. 
 
 
 ```{r warning=FALSE, echo=FALSE, message=FALSE,  cache=TRUE}
